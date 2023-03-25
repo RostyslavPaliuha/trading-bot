@@ -10,7 +10,6 @@ import com.rostyslav.trading.bot.configuration.PrivateConfig;
 import com.rostyslav.trading.bot.service.ClosedCandlesQueue;
 import com.rostyslav.trading.bot.service.OrderService;
 import com.rostyslav.trading.bot.service.TradingStrategyHandler;
-import com.rostyslav.trading.bot.service.connection.DisasterRecoveryService;
 import com.rostyslav.trading.bot.service.event.consumer.CandleEventConsumer;
 import com.rostyslav.trading.bot.service.event.consumer.OrderUpdatesEventConsumer;
 import com.rostyslav.trading.bot.service.indicator.calculator.StochacticCalculator;
@@ -65,7 +64,7 @@ public class TradingBot {
         this.rsiTradingStrategy = new StochRsiStrategy(BTCUSDT, closedCandlesQueue, objectMapper, RSI_PERIOD, orderService, isInPosition, stochacticCalculator);
         this.strategyHandler = new TradingStrategyHandler(List.of(rsiTradingStrategy));
         this.orderUpdatesEventConsumer = new OrderUpdatesEventConsumer(websocketClient, objectMapper, isInPosition, spotClient);
-        this.candleEventConsumer = new CandleEventConsumer(websocketClient, BTCUSDT, TIME_FRAME_1SEC, strategyHandler, new DisasterRecoveryService());
+        this.candleEventConsumer = new CandleEventConsumer(websocketClient, BTCUSDT, TIME_FRAME_1SEC, strategyHandler);
     }
 
     public void run() {

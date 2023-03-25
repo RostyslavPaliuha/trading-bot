@@ -36,4 +36,8 @@ public class ClosedCandlesQueue {
     private boolean isCandleClosed(LinkedHashMap candle) {
         return (boolean) candle.get("x");
     }
+
+    public double[] getClosedCandlePrisesArray() {
+        return closedCandlePrices.stream().mapToDouble(value -> value).toArray();
+    }
 }

@@ -7,6 +7,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rostyslav.trading.bot.configuration.PrivateConfig;
 import com.rostyslav.trading.bot.service.order.HistoricalOrder;
+import com.rostyslav.trading.bot.service.order.LastOrderSide;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 public class OrderService {
@@ -129,6 +131,26 @@ public class OrderService {
                     .orElse(null);
         } catch (JsonProcessingException ex) {
             throw new RuntimeException(ex);
+        }
+    }
+
+    public void syncLastMadeOrder(boolean coldStart,
+                                  String symbol,
+                                  AtomicReference<Double> atomicLastBuyPrice,
+                                  AtomicReference<Double>atomicLastSellPrice,
+                                  LastOrderSide lastOrderSide) {
+        if (coldStart) {
+            HistoricalOrder lastOrder = this.getLastOrder(symbol);
+            String side = lastOrder.getSide();
+            String filled = lastOrder.getStatus();
+            if ("BUY".equals(side) && "FILLED".equals(filled)) {
+                atomicLastBuyPrice.set(lastOrder.getPrice());
+                lastOrderSide = LastOrderSide.BUY;
+            } else if ("SELL".equals(side) && "FILLED".equals(filled)) {
+                lastOrderSide = LastOrderSide.SELL;
+                atomicLastSellPrice.set(lastOrder.getPrice());
+            }
+            coldStart = false;
         }
     }
 }

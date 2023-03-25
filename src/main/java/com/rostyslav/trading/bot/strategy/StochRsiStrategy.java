@@ -4,15 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rostyslav.trading.bot.eventHandler.CandleEventHandler;
 import com.rostyslav.trading.bot.service.ClosedCandlesQueue;
 import com.rostyslav.trading.bot.service.OrderService;
+import com.rostyslav.trading.bot.service.PriceProfitCalculator;
 import com.rostyslav.trading.bot.service.indicator.calculator.StochacticCalculator;
-import com.rostyslav.trading.bot.service.order.HistoricalOrder;
 import com.rostyslav.trading.bot.service.order.LastOrderSide;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,7 +35,11 @@ public class StochRsiStrategy implements TradingStrategy {
 
     private final StochacticCalculator stochacticCalculator;
 
+    private final PriceProfitCalculator priceProfitCalculator = new PriceProfitCalculator();
+
     AtomicReference<Double> atomicLastBuyPrice = new AtomicReference<>(-1D);
+
+    AtomicReference<Double> atomicLastSellPrice = new AtomicReference<>(-1D);
 
     private ClosedCandlesQueue closedCandlesQueue;
 
@@ -72,71 +75,47 @@ public class StochRsiStrategy implements TradingStrategy {
         check if there are free assets and order amount
         if we buy on high then wait for 1 min if price don`t go beck create new buy on current price if
         * */
-        syncLastMadeOrder();
+        orderService.syncLastMadeOrder(coldStart, symbol, atomicLastBuyPrice, atomicLastSellPrice, lastOrderSide);
         log.debug("Applied {} for event: {}", this.getClass().getName(), event);
         CandleEventHandler candleEventHandler = new CandleEventHandler(event, objectMapper);
         Map<String, Object> candleEvent = candleEventHandler.getCandleEvent();
         LinkedHashMap candle = candleEventHandler.getCandle(candleEvent);
         closedCandlesQueue.add(candle);
         LinkedList<Double> closedCandlePrices = closedCandlesQueue.getClosedCandlePrices();
+        // todo for minute and bigger time frames use warm up strategy to generate closed price candles data
         if (closedCandlePrices.size() > closedCandlesSizeThreshold) {
             log.debug("Closed candles passed rsi period threshold.");
-            stochacticCalculator.calculate(getClosedCandlePrisesArray(closedCandlePrices));
+            stochacticCalculator.calculate(closedCandlesQueue.getClosedCandlePrisesArray());
             double[] rsi = stochacticCalculator.getFastK();
-            log.info("RSI calculations: {}, time: {}", rsi, LocalTime.now());
+            log.debug("RSI calculations: {}, time: {}", rsi, LocalTime.now());
             Double lastRsi = rsi[rsi.length - 1];
             Double lastClosedCandlePrise = closedCandlePrices.getLast();
-            Double lastBuyPrice = atomicLastBuyPrice.get();
-            double profitPercentage = getProfitPercentage(lastClosedCandlePrise, lastBuyPrice);
-            if (lastRsi != null && lastRsi >= OVERBOUGHT_RSI && !isInPosition.get() && profitPercentage >= 0.01 && lastOrderSide != LastOrderSide.SELL) {
-                log.debug("OVERBOUGHT RSI position, rsi: {}, closed candle {} , lastBuyPrise {}", lastRsi, lastClosedCandlePrise, lastBuyPrice);
+            double sellProfitPercentage = priceProfitCalculator.getSellProfitPercentage(lastClosedCandlePrise, atomicLastBuyPrice.get());
+            if (lastRsi != null && lastRsi >= OVERBOUGHT_RSI && !isInPosition.get() && sellProfitPercentage >= 10 && lastOrderSide != LastOrderSide.SELL) {
+                log.debug("OVERBOUGHT RSI position, rsi: {}, closed candle {}", lastRsi, lastClosedCandlePrise);
                 try {
                     orderService.sell(symbol, "BTC", lastClosedCandlePrise.toString());
-                    log.info("Sell with profit percentage {}, with price {}", profitPercentage, lastClosedCandlePrise);
+                    log.debug("Sell with profit percentage {}, with price {}", sellProfitPercentage, lastClosedCandlePrise);
                     atomicLastBuyPrice.set(0D);
+                    atomicLastSellPrice.set(lastClosedCandlePrise);
                     lastOrderSide = LastOrderSide.SELL;
                 } catch (Exception e) {
                     log.error("Exception during selling asset: {}", e.getMessage());
                 }
             }
-            if (lastRsi != null && lastRsi <= OVERSELL_RSI && !isInPosition.get() && lastOrderSide != LastOrderSide.BUY) {
+            double buyProfitPercentage = priceProfitCalculator.getBuyProfitPercentage(lastClosedCandlePrise, atomicLastSellPrice.get());
+            if (lastRsi != null && lastRsi <= OVERSELL_RSI && !isInPosition.get() && buyProfitPercentage >= 15 && lastOrderSide != LastOrderSide.BUY) {
                 log.debug("OVERSELL RSI position, rsi: {}, closed candle {} ", lastRsi, lastClosedCandlePrise);
                 try {
                     orderService.buy(symbol, "USDT", lastClosedCandlePrise.toString());
-                    log.info("Buy with price {}", lastClosedCandlePrise.toString());
+                    log.debug("Buy with price {}", lastClosedCandlePrise.toString());
                     atomicLastBuyPrice.set(lastClosedCandlePrise);
+                    atomicLastSellPrice.set(0D);
                     lastOrderSide = LastOrderSide.BUY;
                 } catch (Exception e) {
                     log.error("Exception during buying asset: {}", e.getMessage());
                 }
             }
         }
-    }
-
-    private void syncLastMadeOrder() {
-        if (coldStart) {
-            HistoricalOrder lastOrder = orderService.getLastOrder("BTCUSDT");
-            String side = lastOrder.getSide();
-            String filled = lastOrder.getStatus();
-            if ("BUY".equals(side) && "FILLED".equals(filled)) {
-                atomicLastBuyPrice.set(lastOrder.getPrice());
-                lastOrderSide = LastOrderSide.BUY;
-            } else if ("SELL".equals(side) && "FILLED".equals(filled)) {
-                lastOrderSide = LastOrderSide.SELL;
-            }
-            coldStart = false;
-        }
-    }
-
-    private double getProfitPercentage(Double lastClosedCandlePrise, Double lastBuyPrice) {
-        if (lastClosedCandlePrise - lastBuyPrice < 0) {
-            return 0D;
-        }
-        return (Math.abs(lastBuyPrice - lastClosedCandlePrise) / lastClosedCandlePrise) * 100;
-    }
-
-
-    private double[] getClosedCandlePrisesArray(List<Double> closedCandlePrices) {
-        return closedCandlePrices.stream().mapToDouble(value -> value).toArray();
     }
 }
