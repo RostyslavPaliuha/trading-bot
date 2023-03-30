@@ -2,6 +2,7 @@ package com.rostyslav.trading.bot.strategy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rostyslav.trading.bot.eventHandler.CandleEventHandler;
+import com.rostyslav.trading.bot.notifier.TelegramNotifier;
 import com.rostyslav.trading.bot.service.ClosedCandlesQueue;
 import com.rostyslav.trading.bot.service.OrderService;
 import com.rostyslav.trading.bot.service.PriceProfitCalculator;
@@ -13,8 +14,11 @@ import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static com.rostyslav.trading.bot.service.order.LastOrderSide.*;
 
 @Slf4j
 public class StochRsiStrategy implements TradingStrategy {
@@ -46,6 +50,8 @@ public class StochRsiStrategy implements TradingStrategy {
     private boolean coldStart = true;
 
     private LastOrderSide lastOrderSide;
+
+    private TelegramNotifier telegramNotifier;
 
     public StochRsiStrategy(String symbol,
                             ClosedCandlesQueue closedCandlesQueue,
@@ -83,6 +89,8 @@ public class StochRsiStrategy implements TradingStrategy {
         closedCandlesQueue.add(candle);
         LinkedList<Double> closedCandlePrices = closedCandlesQueue.getClosedCandlePrices();
         // todo for minute and bigger time frames use warm up strategy to generate closed price candles data
+
+
         if (closedCandlePrices.size() > closedCandlesSizeThreshold) {
             log.debug("Closed candles passed rsi period threshold.");
             stochacticCalculator.calculate(closedCandlesQueue.getClosedCandlePrisesArray());
@@ -91,27 +99,41 @@ public class StochRsiStrategy implements TradingStrategy {
             Double lastRsi = rsi[rsi.length - 1];
             Double lastClosedCandlePrise = closedCandlePrices.getLast();
             double sellProfitPercentage = priceProfitCalculator.getSellProfitPercentage(lastClosedCandlePrise, atomicLastBuyPrice.get());
-            if (lastRsi != null && lastRsi >= OVERBOUGHT_RSI && !isInPosition.get() && sellProfitPercentage >= 5 && lastOrderSide != LastOrderSide.SELL) {
+            if (lastOrderSide.equals(SELL) && sellProfitPercentage > 5) {
+                CompletableFuture.runAsync(() -> telegramNotifier.notify(String.format("Price {} grows for {} from the last sell {} operation.",
+                        lastClosedCandlePrise,
+                        sellProfitPercentage,
+                        atomicLastSellPrice.get())));
+            }
+            if (lastRsi != null && lastRsi >= OVERBOUGHT_RSI && !isInPosition.get() && sellProfitPercentage >= 5 && lastOrderSide != SELL) {
                 log.debug("OVERBOUGHT RSI position, rsi: {}, closed candle {}", lastRsi, lastClosedCandlePrise);
                 try {
                     orderService.sell(symbol, "BTC", lastClosedCandlePrise.toString());
+                    CompletableFuture.runAsync(() -> telegramNotifier.notify(String.format("Sold for {}", lastClosedCandlePrise)));
                     log.debug("Sell with profit percentage {}, with price {}", sellProfitPercentage, lastClosedCandlePrise);
                     atomicLastBuyPrice.set(0D);
                     atomicLastSellPrice.set(lastClosedCandlePrise);
-                    lastOrderSide = LastOrderSide.SELL;
+                    lastOrderSide = SELL;
                 } catch (Exception e) {
                     log.error("Exception during selling asset: {}", e.getMessage());
                 }
             }
             double buyProfitPercentage = priceProfitCalculator.getBuyProfitPercentage(lastClosedCandlePrise, atomicLastSellPrice.get());
-            if (lastRsi != null && lastRsi <= OVERSELL_RSI && !isInPosition.get() && buyProfitPercentage >= 5 && lastOrderSide != LastOrderSide.BUY) {
+            if (lastOrderSide.equals(BUY) && buyProfitPercentage > 5) {
+                CompletableFuture.runAsync(() -> telegramNotifier.notify(String.format("Price {} falls for {} from the last buy {} operation.",
+                        lastClosedCandlePrise,
+                        buyProfitPercentage,
+                        atomicLastBuyPrice.get())));
+            }
+            if (lastRsi != null && lastRsi <= OVERSELL_RSI && !isInPosition.get() && buyProfitPercentage >= 5 && lastOrderSide != BUY) {
                 log.debug("OVERSELL RSI position, rsi: {}, closed candle {} ", lastRsi, lastClosedCandlePrise);
                 try {
                     orderService.buy(symbol, "USDT", lastClosedCandlePrise.toString());
+                    CompletableFuture.runAsync(() -> telegramNotifier.notify(String.format("Bought for {}", lastClosedCandlePrise)));
                     log.debug("Buy with price {}", lastClosedCandlePrise.toString());
                     atomicLastBuyPrice.set(lastClosedCandlePrise);
                     atomicLastSellPrice.set(0D);
-                    lastOrderSide = LastOrderSide.BUY;
+                    lastOrderSide = BUY;
                 } catch (Exception e) {
                     log.error("Exception during buying asset: {}", e.getMessage());
                 }

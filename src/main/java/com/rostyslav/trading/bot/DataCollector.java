@@ -5,7 +5,6 @@ import com.binance.connector.client.WebsocketClient;
 import com.binance.connector.client.impl.SpotClientImpl;
 import com.binance.connector.client.impl.WebsocketClientImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
 import com.rostyslav.trading.bot.eventHandler.CandleEventHandler;
 import com.rostyslav.trading.bot.service.ClosedCandlesQueue;
 import com.rostyslav.trading.bot.service.indicator.calculator.StochacticCalculator;
@@ -47,7 +46,7 @@ public class DataCollector {
     public static void main(String[] args) {
         DataCollector dataCollector = new DataCollector(new WebsocketClientImpl());
         // dataCollector.collectToFile();
-        dataCollector.test();
+      //  dataCollector.test();
     }
 
     public void collectToFile() {
@@ -80,7 +79,7 @@ public class DataCollector {
         }
     }
 
-    public void test() {
+   /* public void test() {
         LocalDateTime startTime = LocalDateTime.now().minus(Duration.ofDays(1));
         Instant instant = startTime.toInstant(ZoneOffset.of("+02:00"));
         LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
@@ -111,7 +110,7 @@ public class DataCollector {
         System.out.println("");
         System.out.print("FastD ");
         Arrays.stream( calculator.getFastD()).forEach(value -> System.out.print(String.format("%.1f",value)+", "));
-    }
+    }*/
 
 
 
