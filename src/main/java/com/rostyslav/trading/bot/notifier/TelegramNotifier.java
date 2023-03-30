@@ -1,9 +1,5 @@
 package com.rostyslav.trading.bot.notifier;
 
-import lombok.SneakyThrows;
-import org.telegram.telegrambots.meta.TelegramBotsApi;
-import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
-
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;

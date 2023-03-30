@@ -7,6 +7,7 @@ import com.binance.connector.client.impl.WebsocketClientImpl;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rostyslav.trading.bot.configuration.PrivateConfig;
+import com.rostyslav.trading.bot.notifier.TelegramNotifier;
 import com.rostyslav.trading.bot.service.ClosedCandlesQueue;
 import com.rostyslav.trading.bot.service.OrderService;
 import com.rostyslav.trading.bot.service.TradingStrategyHandler;
@@ -61,7 +62,7 @@ public class TradingBot {
         this.closedCandlesQueue = new ClosedCandlesQueue(50);
         this.orderService = new OrderService(objectMapper, spotClient);
         this.stochacticCalculator = new StochacticCalculator(14, 14, 14);
-        this.rsiTradingStrategy = new StochRsiStrategy(BTCUSDT, closedCandlesQueue, objectMapper, RSI_PERIOD, orderService, isInPosition, stochacticCalculator);
+        this.rsiTradingStrategy = new StochRsiStrategy(BTCUSDT, closedCandlesQueue, objectMapper, RSI_PERIOD, orderService, isInPosition, stochacticCalculator, new TelegramNotifier());
         this.strategyHandler = new TradingStrategyHandler(List.of(rsiTradingStrategy));
         this.orderUpdatesEventConsumer = new OrderUpdatesEventConsumer(websocketClient, objectMapper, isInPosition, spotClient);
         this.candleEventConsumer = new CandleEventConsumer(websocketClient, BTCUSDT, TIME_FRAME_1SEC, strategyHandler);

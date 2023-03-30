@@ -51,7 +51,7 @@ public class StochRsiStrategy implements TradingStrategy {
 
     private LastOrderSide lastOrderSide;
 
-    private TelegramNotifier telegramNotifier;
+    private final TelegramNotifier telegramNotifier;
 
     public StochRsiStrategy(String symbol,
                             ClosedCandlesQueue closedCandlesQueue,
@@ -59,7 +59,8 @@ public class StochRsiStrategy implements TradingStrategy {
                             Integer closedCandlesSizeThreshold,
                             OrderService orderService,
                             AtomicBoolean isInPosition,
-                            StochacticCalculator stochacticCalculator) {
+                            StochacticCalculator stochacticCalculator,
+                            TelegramNotifier telegramNotifier) {
         this.symbol = symbol;
         this.closedCandlesQueue = closedCandlesQueue;
         this.objectMapper = objectMapper;
@@ -67,6 +68,7 @@ public class StochRsiStrategy implements TradingStrategy {
         this.orderService = orderService;
         this.isInPosition = isInPosition;
         this.stochacticCalculator = stochacticCalculator;
+        this.telegramNotifier = telegramNotifier;
     }
 
     @Override
