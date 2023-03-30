@@ -101,7 +101,7 @@ public class StochRsiStrategy implements TradingStrategy {
             Double lastRsi = rsi[rsi.length - 1];
             Double lastClosedCandlePrise = closedCandlePrices.getLast();
             double sellProfitPercentage = priceProfitCalculator.getSellProfitPercentage(lastClosedCandlePrise, atomicLastBuyPrice.get());
-            if (lastOrderSide.equals(SELL) && sellProfitPercentage > 5) {
+            if (SELL.equals(lastOrderSide) && sellProfitPercentage > 5) {
                 CompletableFuture.runAsync(() -> telegramNotifier.notify(String.format("Price {} grows for {} from the last sell {} operation.",
                         lastClosedCandlePrise,
                         sellProfitPercentage,
@@ -121,7 +121,7 @@ public class StochRsiStrategy implements TradingStrategy {
                 }
             }
             double buyProfitPercentage = priceProfitCalculator.getBuyProfitPercentage(lastClosedCandlePrise, atomicLastSellPrice.get());
-            if (lastOrderSide.equals(BUY) && buyProfitPercentage > 5) {
+            if (BUY.equals(lastOrderSide) && buyProfitPercentage > 5) {
                 CompletableFuture.runAsync(() -> telegramNotifier.notify(String.format("Price {} falls for {} from the last buy {} operation.",
                         lastClosedCandlePrise,
                         buyProfitPercentage,
