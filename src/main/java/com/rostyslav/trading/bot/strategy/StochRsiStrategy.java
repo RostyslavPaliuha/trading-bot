@@ -91,7 +91,7 @@ public class StochRsiStrategy implements TradingStrategy {
             Double lastRsi = rsi[rsi.length - 1];
             Double lastClosedCandlePrise = closedCandlePrices.getLast();
             double sellProfitPercentage = priceProfitCalculator.getSellProfitPercentage(lastClosedCandlePrise, atomicLastBuyPrice.get());
-            if (lastRsi != null && lastRsi >= OVERBOUGHT_RSI && !isInPosition.get() && sellProfitPercentage >= 10 && lastOrderSide != LastOrderSide.SELL) {
+            if (lastRsi != null && lastRsi >= OVERBOUGHT_RSI && !isInPosition.get() && sellProfitPercentage >= 5 && lastOrderSide != LastOrderSide.SELL) {
                 log.debug("OVERBOUGHT RSI position, rsi: {}, closed candle {}", lastRsi, lastClosedCandlePrise);
                 try {
                     orderService.sell(symbol, "BTC", lastClosedCandlePrise.toString());
@@ -104,7 +104,7 @@ public class StochRsiStrategy implements TradingStrategy {
                 }
             }
             double buyProfitPercentage = priceProfitCalculator.getBuyProfitPercentage(lastClosedCandlePrise, atomicLastSellPrice.get());
-            if (lastRsi != null && lastRsi <= OVERSELL_RSI && !isInPosition.get() && buyProfitPercentage >= 15 && lastOrderSide != LastOrderSide.BUY) {
+            if (lastRsi != null && lastRsi <= OVERSELL_RSI && !isInPosition.get() && buyProfitPercentage >= 5 && lastOrderSide != LastOrderSide.BUY) {
                 log.debug("OVERSELL RSI position, rsi: {}, closed candle {} ", lastRsi, lastClosedCandlePrise);
                 try {
                     orderService.buy(symbol, "USDT", lastClosedCandlePrise.toString());
