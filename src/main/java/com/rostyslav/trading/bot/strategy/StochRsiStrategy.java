@@ -127,7 +127,7 @@ public class StochRsiStrategy implements TradingStrategy {
                         buyProfitPercentage,
                         atomicLastBuyPrice.get())));
             }
-            if (lastRsi != null && lastRsi <= OVERSELL_RSI && !isInPosition.get() && buyProfitPercentage >= 5 && lastOrderSide != BUY) {
+            if (lastRsi != null && lastRsi <= OVERSELL_RSI && !isInPosition.get() && buyProfitPercentage >= 1 && lastOrderSide != BUY) {
                 log.debug("OVERSELL RSI position, rsi: {}, closed candle {} ", lastRsi, lastClosedCandlePrise);
                 try {
                     orderService.buy(symbol, "USDT", lastClosedCandlePrise.toString());
