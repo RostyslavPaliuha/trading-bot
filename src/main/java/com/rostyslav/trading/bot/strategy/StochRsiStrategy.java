@@ -107,7 +107,7 @@ public class StochRsiStrategy implements TradingStrategy {
                         sellProfitPercentage,
                         atomicLastSellPrice.get())));
             }
-            if (lastRsi != null && lastRsi >= OVERBOUGHT_RSI && !isInPosition.get() && sellProfitPercentage >= 5 && lastOrderSide != SELL) {
+            if (lastRsi != null && lastRsi >= OVERBOUGHT_RSI && !isInPosition.get() && sellProfitPercentage >= 1 && lastOrderSide != SELL) {
                 log.debug("OVERBOUGHT RSI position, rsi: {}, closed candle {}", lastRsi, lastClosedCandlePrise);
                 try {
                     orderService.sell(symbol, "BTC", lastClosedCandlePrise.toString());
@@ -121,7 +121,7 @@ public class StochRsiStrategy implements TradingStrategy {
                 }
             }
             double buyProfitPercentage = priceProfitCalculator.getBuyProfitPercentage(lastClosedCandlePrise, atomicLastSellPrice.get());
-            if (BUY.equals(lastOrderSide) && buyProfitPercentage > 5) {
+            if (BUY.equals(lastOrderSide) && buyProfitPercentage > 1) {
                 CompletableFuture.runAsync(() -> telegramNotifier.notify(String.format("Price {} falls for {} from the last buy {} operation.",
                         lastClosedCandlePrise,
                         buyProfitPercentage,
