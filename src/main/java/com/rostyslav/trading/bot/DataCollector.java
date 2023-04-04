@@ -45,7 +45,7 @@ public class DataCollector {
 
     public static void main(String[] args) {
         DataCollector dataCollector = new DataCollector(new WebsocketClientImpl());
-        // dataCollector.collectToFile();
+        dataCollector.collectToFile();
       //  dataCollector.test();
     }
 
@@ -54,7 +54,7 @@ public class DataCollector {
                 data -> {
                 },
                 message -> {
-                    writeToFile(message);
+                   log.info(message);
                 },
                 closeMessage -> {
                 },

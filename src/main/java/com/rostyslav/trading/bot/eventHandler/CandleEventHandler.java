@@ -1,9 +1,11 @@
 package com.rostyslav.trading.bot.eventHandler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public class CandleEventHandler {
@@ -11,6 +13,7 @@ public class CandleEventHandler {
     private final String event;
 
     private final ObjectMapper objectMapper;
+
 
     public CandleEventHandler(String event, ObjectMapper objectMapper) {
         this.event = event;

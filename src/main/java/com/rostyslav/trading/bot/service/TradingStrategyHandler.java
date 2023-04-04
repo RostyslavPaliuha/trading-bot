@@ -17,7 +17,7 @@ public class TradingStrategyHandler implements WebSocketCallback {
 
     @Override
     public void onReceive(String data) {
-        log.debug("Received event: {}", data);
+        log.trace("Received event: {}", data);
         strategies.forEach(tradingStrategy -> tradingStrategy.apply(data));
     }
 }

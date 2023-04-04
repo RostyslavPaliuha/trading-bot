@@ -11,11 +11,15 @@ import com.rostyslav.trading.bot.notifier.TelegramNotifier;
 import com.rostyslav.trading.bot.service.ClosedCandlesQueue;
 import com.rostyslav.trading.bot.service.OrderService;
 import com.rostyslav.trading.bot.service.TradingStrategyHandler;
+import com.rostyslav.trading.bot.service.candle.CandleService;
+import com.rostyslav.trading.bot.service.event.EventService;
 import com.rostyslav.trading.bot.service.event.consumer.CandleEventConsumer;
 import com.rostyslav.trading.bot.service.event.consumer.OrderUpdatesEventConsumer;
 import com.rostyslav.trading.bot.service.indicator.calculator.StochacticCalculator;
+import com.rostyslav.trading.bot.service.indicator.calculator.ma.EMaSmaCalculator;
 import com.rostyslav.trading.bot.strategy.StochRsiStrategy;
 import com.rostyslav.trading.bot.strategy.TradingStrategy;
+import com.rostyslav.trading.bot.strategy.ma.EmaSmaTradingStrategy;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -54,6 +58,8 @@ public class TradingBot {
 
     private final StochacticCalculator stochacticCalculator;
 
+    private final EmaSmaTradingStrategy maTradingStrategy;
+
     public TradingBot() {
         this.spotClient = new SpotClientImpl(PrivateConfig.API_KEY, PrivateConfig.SECRET_KEY);
         this.websocketClient = new WebsocketClientImpl();
@@ -63,7 +69,8 @@ public class TradingBot {
         this.orderService = new OrderService(objectMapper, spotClient);
         this.stochacticCalculator = new StochacticCalculator(14, 14, 14);
         this.rsiTradingStrategy = new StochRsiStrategy(BTCUSDT, closedCandlesQueue, objectMapper, RSI_PERIOD, orderService, isInPosition, stochacticCalculator, new TelegramNotifier());
-        this.strategyHandler = new TradingStrategyHandler(List.of(rsiTradingStrategy));
+        this.maTradingStrategy = new EmaSmaTradingStrategy(new EMaSmaCalculator(),objectMapper,new CandleService(spotClient,objectMapper),new EventService(objectMapper));
+        this.strategyHandler = new TradingStrategyHandler(List.of(maTradingStrategy));
         this.orderUpdatesEventConsumer = new OrderUpdatesEventConsumer(websocketClient, objectMapper, isInPosition, spotClient);
         this.candleEventConsumer = new CandleEventConsumer(websocketClient, BTCUSDT, TIME_FRAME_1SEC, strategyHandler);
     }
