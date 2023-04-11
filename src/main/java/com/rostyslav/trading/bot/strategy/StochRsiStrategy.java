@@ -49,7 +49,7 @@ public class StochRsiStrategy implements TradingStrategy {
   AtomicReference<Double> atomicLastBuyPrice = new AtomicReference<>(-1D);
   AtomicReference<Double> atomicLastSellPrice = new AtomicReference<>(-1D);
   private boolean coldStart = true;
-  private LastOrderSide lastOrderSide;
+  private AtomicReference <LastOrderSide> lastOrderSide=new AtomicReference<>();
 
   public StochRsiStrategy(String symbol,
       ObjectMapper objectMapper,
@@ -71,7 +71,6 @@ public class StochRsiStrategy implements TradingStrategy {
 
   @Override
   public void apply(String event) {
-    log.debug("Received event: {}", event);
     orderService.syncLastMadeOrder(coldStart, symbol, atomicLastBuyPrice, atomicLastSellPrice,
         lastOrderSide);
     Event deserializedEvent = eventService.getDeserializedEvent(event);
@@ -81,11 +80,19 @@ public class StochRsiStrategy implements TradingStrategy {
     double[] candlesPrices = getClosedCandlesPrices();
     Double rsi = getRSI(candlesPrices);
     Double currentPrice = currentCandle.getClosedPrice();
+    log.debug("Current candle price: {} , rsi: {}", currentPrice, rsi);
     if (rsi != null && rsi >= OVERBOUGHT_RSI && !isInPosition.get()
-        && atomicLastBuyPrice.get() < currentPrice && lastOrderSide != SELL) {
+        && atomicLastBuyPrice.get() < currentPrice && !lastOrderSide.get().equals( SELL)) {
+      // flag check for price increase
+      //save current price and check price movement up
+      //if rsi first time moves belove overbought then sell
       sell(currentPrice);
     }
-    if (rsi != null && rsi <= OVERSELL_RSI && !isInPosition.get() && lastOrderSide != BUY) {
+    if (rsi != null && rsi <= OVERSELL_RSI && !isInPosition.get() && !lastOrderSide.get().equals( BUY)) {
+      //the same here
+      // flag check for price reduce
+      //save current price and check price reduce
+      //if rsi first time moves above oversell then buy
       buy(currentPrice);
     }
   }
@@ -98,7 +105,7 @@ public class StochRsiStrategy implements TradingStrategy {
       log.debug("Buy with price {}", currentPrice);
       atomicLastBuyPrice.set(currentPrice);
       atomicLastSellPrice.set(0D);
-      lastOrderSide = BUY;
+      lastOrderSide.set( BUY);
     } catch (Exception e) {
       log.error("Exception during buying asset: {}", e.getMessage());
     }
@@ -112,7 +119,7 @@ public class StochRsiStrategy implements TradingStrategy {
       log.debug("Sell with price {}", currentPrice);
       atomicLastBuyPrice.set(0D);
       atomicLastSellPrice.set(currentPrice);
-      lastOrderSide = SELL;
+      lastOrderSide.set(SELL);
     } catch (Exception e) {
       log.error("Exception during selling asset: {}", e.getMessage());
     }

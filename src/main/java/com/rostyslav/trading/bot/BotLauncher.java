@@ -7,7 +7,7 @@ import java.util.Arrays;
 public class BotLauncher {
 
     public static void main(String[] args) {
-
+        setLoggingLevel(Level.DEBUG);
         if (hasLoggingArgument(args)) {
             Arrays.stream(args)
                     .map(argument -> argument.split("=")[1])

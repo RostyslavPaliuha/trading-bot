@@ -138,16 +138,16 @@ public class OrderService {
                                   String symbol,
                                   AtomicReference<Double> atomicLastBuyPrice,
                                   AtomicReference<Double>atomicLastSellPrice,
-                                  LastOrderSide lastOrderSide) {
+                                 AtomicReference< LastOrderSide> lastOrderSide) {
         if (coldStart) {
             HistoricalOrder lastOrder = this.getLastOrder(symbol);
             String side = lastOrder.getSide();
             String filled = lastOrder.getStatus();
             if ("BUY".equals(side) && "FILLED".equals(filled)) {
                 atomicLastBuyPrice.set(lastOrder.getPrice());
-                lastOrderSide = LastOrderSide.BUY;
+                lastOrderSide.set( LastOrderSide.BUY);
             } else if ("SELL".equals(side) && "FILLED".equals(filled)) {
-                lastOrderSide = LastOrderSide.SELL;
+                lastOrderSide.set( LastOrderSide.SELL);
                 atomicLastSellPrice.set(lastOrder.getPrice());
             }
             coldStart = false;
