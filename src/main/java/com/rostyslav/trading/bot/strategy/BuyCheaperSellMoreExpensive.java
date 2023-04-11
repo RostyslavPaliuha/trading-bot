@@ -8,9 +8,8 @@ public class BuyCheaperSellMoreExpensive implements TradingStrategy{
         //download the history data?
         //check position where we are right now
         //-if last buy then find the closest sell position
-        // try to find dynamicly the best profitable position based on
-        //
+        // try to find dynamically the best profitable position based on
+
         //-if last sell then find the closest buy position
-        //
     }
 }
