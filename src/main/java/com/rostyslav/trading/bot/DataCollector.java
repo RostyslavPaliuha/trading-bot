@@ -5,31 +5,17 @@ import com.binance.connector.client.WebsocketClient;
 import com.binance.connector.client.impl.SpotClientImpl;
 import com.binance.connector.client.impl.WebsocketClientImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rostyslav.trading.bot.eventHandler.CandleEventHandler;
 import com.rostyslav.trading.bot.service.ClosedCandlesQueue;
-import com.rostyslav.trading.bot.service.indicator.calculator.StochacticCalculator;
 import com.tictactec.ta.lib.Core;
 import com.tictactec.ta.lib.MAType;
 import com.tictactec.ta.lib.MInteger;
 import com.tictactec.ta.lib.RetCode;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-
-import java.io.FileOutputStream;
-import java.io.PrintWriter;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public class DataCollector {
 
     private WebsocketClient websocketClient;
-
-    private CandleEventHandler candleEventHandler;
 
     private ObjectMapper objectMapper;
 
@@ -61,22 +47,6 @@ public class DataCollector {
                 failureMessage -> {
                 });
 
-    }
-
-    @SneakyThrows
-    private void writeToFile(String event) {
-        candleEventHandler = new CandleEventHandler(event, objectMapper);
-        Map<String, Object> candleEvent = candleEventHandler.getCandleEvent();
-        LinkedHashMap candle = candleEventHandler.getCandle(candleEvent);
-        closedCandlesQueue.add(candle);
-        LinkedList<Double> closedCandlePrices = closedCandlesQueue.getClosedCandlePrices();
-        log.info("Prices buffered: {}", closedCandlePrices.size());
-        if (closedCandlePrices.size() > 10000) {
-            PrintWriter printWriter = new PrintWriter(new FileOutputStream("/1sClosedCandles.txt"));
-            closedCandlePrices.forEach(printWriter::println);
-            // Files.writeString(Path.of("/testData.txt"), last);
-            System.exit(0);
-        }
     }
 
    /* public void test() {

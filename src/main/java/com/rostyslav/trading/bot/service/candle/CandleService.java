@@ -23,7 +23,7 @@ public class CandleService {
   }
 
   @SneakyThrows
-  public LinkedList<CandleWebClientResponse> getDeserializedCandles(String symbol, long endTime,byte limit) {
+  public LinkedList<CandleWebClientResponse> getDeserializedCandles(String symbol, long endTime,short limit) {
     LinkedHashMap hashMap = new LinkedHashMap();
     hashMap.put("symbol", symbol);
     hashMap.put("interval", "1s");

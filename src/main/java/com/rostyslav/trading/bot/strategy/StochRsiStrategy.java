@@ -4,21 +4,24 @@ import static com.rostyslav.trading.bot.service.order.LastOrderSide.BUY;
 import static com.rostyslav.trading.bot.service.order.LastOrderSide.SELL;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rostyslav.trading.bot.eventHandler.CandleEventHandler;
+import com.rostyslav.trading.bot.model.Candle;
+import com.rostyslav.trading.bot.model.input.socket.Event;
+import com.rostyslav.trading.bot.model.input.socket.EventCandle;
 import com.rostyslav.trading.bot.notifier.TelegramNotifier;
 import com.rostyslav.trading.bot.service.ClosedCandlesQueue;
 import com.rostyslav.trading.bot.service.OrderService;
-import com.rostyslav.trading.bot.service.PriceProfitCalculator;
-import com.rostyslav.trading.bot.service.indicator.calculator.StochacticCalculator;
+import com.rostyslav.trading.bot.service.candle.CandleService;
+import com.rostyslav.trading.bot.service.event.EventService;
+import com.rostyslav.trading.bot.service.indicator.calculator.RsiCalculator;
 import com.rostyslav.trading.bot.service.order.LastOrderSide;
-import java.time.LocalTime;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
-import java.util.Map;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 
 @Slf4j
 public class StochRsiStrategy implements TradingStrategy {
@@ -37,105 +40,121 @@ public class StochRsiStrategy implements TradingStrategy {
 
   private final ObjectMapper objectMapper;
 
-  private final StochacticCalculator stochacticCalculator;
+  private final RsiCalculator rsiCalculator;
 
-  private final PriceProfitCalculator priceProfitCalculator = new PriceProfitCalculator();
   private final TelegramNotifier telegramNotifier;
+  private final CandleService candleService;
+  private final EventService eventService;
+  private final LinkedList<Candle> candles = new LinkedList<>();
   AtomicReference<Double> atomicLastBuyPrice = new AtomicReference<>(-1D);
   AtomicReference<Double> atomicLastSellPrice = new AtomicReference<>(-1D);
-  private ClosedCandlesQueue closedCandlesQueue;
   private boolean coldStart = true;
   private LastOrderSide lastOrderSide;
 
   public StochRsiStrategy(String symbol,
-      ClosedCandlesQueue closedCandlesQueue,
       ObjectMapper objectMapper,
       Integer closedCandlesSizeThreshold,
       OrderService orderService,
       AtomicBoolean isInPosition,
-      StochacticCalculator stochacticCalculator,
-      TelegramNotifier telegramNotifier) {
+      RsiCalculator rsiCalculator,
+      TelegramNotifier telegramNotifier, CandleService candleService, EventService eventService) {
     this.symbol = symbol;
-    this.closedCandlesQueue = closedCandlesQueue;
     this.objectMapper = objectMapper;
     this.closedCandlesSizeThreshold = closedCandlesSizeThreshold;
     this.orderService = orderService;
     this.isInPosition = isInPosition;
-    this.stochacticCalculator = stochacticCalculator;
+    this.rsiCalculator = rsiCalculator;
     this.telegramNotifier = telegramNotifier;
+    this.candleService = candleService;
+    this.eventService = eventService;
   }
 
   @Override
   public void apply(String event) {
-    log.info("Received event: {}", event);
+    log.debug("Received event: {}", event);
     orderService.syncLastMadeOrder(coldStart, symbol, atomicLastBuyPrice, atomicLastSellPrice,
         lastOrderSide);
-    CandleEventHandler candleEventHandler = new CandleEventHandler(event, objectMapper);
-    Map<String, Object> candleEvent = candleEventHandler.getCandleEvent();
-    LinkedHashMap candle = candleEventHandler.getCandle(candleEvent);
-    closedCandlesQueue.add(candle);
-    LinkedList<Double> closedCandlePrices = closedCandlesQueue.getClosedCandlePrices();
-    if (closedCandlePrices.size() > closedCandlesSizeThreshold) {
-      log.debug("Closed candles passed rsi period threshold.");
-      stochacticCalculator.calculate(closedCandlesQueue.getClosedCandlePrisesArray());
-      double[] rsi = stochacticCalculator.getFastK();
-      log.debug("RSI calculations: {}, time: {}", rsi, LocalTime.now());
-      Double lastRsi = rsi[rsi.length - 1];
-      Double lastClosedCandlePrise = closedCandlePrices.getLast();
-      if (lastRsi != null && lastRsi >= OVERBOUGHT_RSI && !isInPosition.get()
-          && atomicLastBuyPrice.get() < lastClosedCandlePrise && lastOrderSide != SELL) {
-        log.debug("OVERBOUGHT RSI position, rsi: {}, closed candle {}", lastRsi,
-            lastClosedCandlePrise);
-        try {
-          orderService.sell(symbol, "BTC", lastClosedCandlePrise.toString());
-          CompletableFuture.runAsync(
-              () -> telegramNotifier.notify(String.format("Sold for %s", lastClosedCandlePrise)));
-          log.debug("Sell with price {}", lastClosedCandlePrise);
-          atomicLastBuyPrice.set(0D);
-          atomicLastSellPrice.set(lastClosedCandlePrise);
-          lastOrderSide = SELL;
-        } catch (Exception e) {
-          log.error("Exception during selling asset: {}", e.getMessage());
-        }
-      }
-      if (lastRsi != null && lastRsi <= OVERSELL_RSI
-          && !isInPosition.get()
-          && lastClosedCandlePrise < atomicLastSellPrice.get()
-          && lastOrderSide != BUY) {
-        log.debug("OVERSELL RSI position, rsi: {}, closed candle {} ", lastRsi,
-            lastClosedCandlePrise);
-        try {
-          orderService.buy(symbol, "USDT", lastClosedCandlePrise.toString());
-          CompletableFuture.runAsync(
-              () -> telegramNotifier.notify(String.format("Bought for %s", lastClosedCandlePrise)));
-          log.debug("Buy with price {}", lastClosedCandlePrise.toString());
-          atomicLastBuyPrice.set(lastClosedCandlePrise);
-          atomicLastSellPrice.set(0D);
-          lastOrderSide = BUY;
-        } catch (Exception e) {
-          log.error("Exception during buying asset: {}", e.getMessage());
-        }
-      }
+    Event deserializedEvent = eventService.getDeserializedEvent(event);
+    EventCandle eventCandle = getCandle(deserializedEvent);
+    Candle currentCandle = candleService.mapEventCandleToDomain(eventCandle);
+    fillCandleQuee(deserializedEvent, currentCandle);
+    double[] candlesPrices = getClosedCandlesPrices();
+    Double rsi = getRSI(candlesPrices);
+    Double currentPrice = currentCandle.getClosedPrice();
+    if (rsi != null && rsi >= OVERBOUGHT_RSI && !isInPosition.get()
+        && atomicLastBuyPrice.get() < currentPrice && lastOrderSide != SELL) {
+      sell(currentPrice);
+    }
+    if (rsi != null && rsi <= OVERSELL_RSI && !isInPosition.get() && lastOrderSide != BUY) {
+      buy(currentPrice);
     }
   }
 
-  private void extracted1(Double lastClosedCandlePrise, double buyProfitPercentage) {
-    if (BUY.equals(lastOrderSide) && buyProfitPercentage > 5) {
-      CompletableFuture.runAsync(() -> telegramNotifier.notify(
-          String.format("Price {} falls for {} from the last buy {} operation.",
-              lastClosedCandlePrise,
-              buyProfitPercentage,
-              atomicLastBuyPrice.get())));
+  private void buy(Double currentPrice) {
+    try {
+      orderService.buy(symbol, "USDT", currentPrice.toString());
+      CompletableFuture.runAsync(
+          () -> telegramNotifier.notify(String.format("Bought for %s", currentPrice)));
+      log.debug("Buy with price {}", currentPrice);
+      atomicLastBuyPrice.set(currentPrice);
+      atomicLastSellPrice.set(0D);
+      lastOrderSide = BUY;
+    } catch (Exception e) {
+      log.error("Exception during buying asset: {}", e.getMessage());
     }
   }
 
-  private void extracted(Double lastClosedCandlePrise, double sellProfitPercentage) {
-    if (SELL.equals(lastOrderSide) && sellProfitPercentage > 5) {
-      CompletableFuture.runAsync(() -> telegramNotifier.notify(
-          String.format("Price {} grows for {} from the last sell {} operation.",
-              lastClosedCandlePrise,
-              sellProfitPercentage,
-              atomicLastSellPrice.get())));
+  private void sell(Double currentPrice) {
+    try {
+      orderService.sell(symbol, "BTC", currentPrice.toString());
+      CompletableFuture.runAsync(
+          () -> telegramNotifier.notify(String.format("Sold for %s", currentPrice)));
+      log.debug("Sell with price {}", currentPrice);
+      atomicLastBuyPrice.set(0D);
+      atomicLastSellPrice.set(currentPrice);
+      lastOrderSide = SELL;
+    } catch (Exception e) {
+      log.error("Exception during selling asset: {}", e.getMessage());
     }
+  }
+
+  @NotNull
+  private Double getRSI(double[] candlesPrices) {
+    double[] rsi = rsiCalculator.calculateRSI(candlesPrices, 30);
+    Double lastRsi = rsi[rsi.length - 1];
+    return lastRsi;
+  }
+
+  private double[] getClosedCandlesPrices() {
+    return candles.stream()
+        .map(candle -> candle.getClosedPrice())
+        .mapToDouble(value -> value)
+        .toArray();
+  }
+
+  private EventCandle getCandle(Event deserializedEvent) {
+    EventCandle eventCandle = deserializedEvent.getCandle();
+    return eventCandle;
+  }
+
+  private void fillCandleQuee(Event deserializedEvent, Candle latestCandle) {
+    if (coldStart) {
+      Long eventTime = deserializedEvent.getEventTime();
+      long desiredLastCandleTime = eventTime - 1000L;
+      candles.addAll(getPreviousCandlesSortedByTimeInDesc(desiredLastCandleTime));
+      candles.add(latestCandle);
+      coldStart = false;
+    } else {
+      candles.pollFirst();
+      candles.offerLast(latestCandle);
+    }
+  }
+
+  @NotNull
+  private List<Candle> getPreviousCandlesSortedByTimeInDesc(long desiredLastCandleTime) {
+    return candleService.getDeserializedCandles("BTCUSDT", desiredLastCandleTime, (short) 120)
+        .stream()
+        .map(candleService::mapWebClientCandleToDomain)
+        .collect(Collectors.toList());
   }
 }
