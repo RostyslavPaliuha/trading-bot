@@ -23,9 +23,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class StochRsiStrategy implements TradingStrategy {
 
-  private static final Integer OVERBOUGHT_RSI = 70;
+  private static final Integer OVERBOUGHT_RSI = 90;
 
-  private static final Integer OVERSELL_RSI = 30;
+  private static final Integer OVERSELL_RSI = 10;
 
   private final String symbol;
 
@@ -67,16 +67,6 @@ public class StochRsiStrategy implements TradingStrategy {
 
   @Override
   public void apply(String event) {
-        /*
-        *apply bollinger bands, ma, rsi
-        check if we have open orders
-        check last buy price is last order was buy
-        if we have last buy price create chank order for sell with 1% price difference
-        make new orders only with 25% of balance
-        max order amount 4
-        check if there are free assets and order amount
-        if we buy on high then wait for 1 min if price don`t go beck create new buy on current price if
-        * */
     log.info("Received event: {}", event);
     orderService.syncLastMadeOrder(coldStart, symbol, atomicLastBuyPrice, atomicLastSellPrice,
         lastOrderSide);
@@ -92,18 +82,15 @@ public class StochRsiStrategy implements TradingStrategy {
       log.debug("RSI calculations: {}, time: {}", rsi, LocalTime.now());
       Double lastRsi = rsi[rsi.length - 1];
       Double lastClosedCandlePrise = closedCandlePrices.getLast();
-      double sellProfitPercentage = priceProfitCalculator.getSellProfitPercentage(
-          lastClosedCandlePrise, atomicLastBuyPrice.get());
       if (lastRsi != null && lastRsi >= OVERBOUGHT_RSI && !isInPosition.get()
-          && sellProfitPercentage >= 1 && lastOrderSide != SELL) {
+          && atomicLastBuyPrice.get() < lastClosedCandlePrise && lastOrderSide != SELL) {
         log.debug("OVERBOUGHT RSI position, rsi: {}, closed candle {}", lastRsi,
             lastClosedCandlePrise);
         try {
           orderService.sell(symbol, "BTC", lastClosedCandlePrise.toString());
           CompletableFuture.runAsync(
               () -> telegramNotifier.notify(String.format("Sold for %s", lastClosedCandlePrise)));
-          log.debug("Sell with profit percentage {}, with price {}", sellProfitPercentage,
-              lastClosedCandlePrise);
+          log.debug("Sell with price {}", lastClosedCandlePrise);
           atomicLastBuyPrice.set(0D);
           atomicLastSellPrice.set(lastClosedCandlePrise);
           lastOrderSide = SELL;
@@ -111,10 +98,10 @@ public class StochRsiStrategy implements TradingStrategy {
           log.error("Exception during selling asset: {}", e.getMessage());
         }
       }
-      double buyProfitPercentage = priceProfitCalculator.getBuyProfitPercentage(
-          lastClosedCandlePrise, atomicLastSellPrice.get());
-      if (lastRsi != null && lastRsi <= OVERSELL_RSI && !isInPosition.get()
-          && buyProfitPercentage >= 1 && lastOrderSide != BUY) {
+      if (lastRsi != null && lastRsi <= OVERSELL_RSI
+          && !isInPosition.get()
+          && lastClosedCandlePrise < atomicLastSellPrice.get()
+          && lastOrderSide != BUY) {
         log.debug("OVERSELL RSI position, rsi: {}, closed candle {} ", lastRsi,
             lastClosedCandlePrise);
         try {
