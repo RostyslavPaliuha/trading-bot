@@ -1,7 +1,6 @@
 package com.rostyslav.trading.bot.strategy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rostyslav.trading.bot.model.Candle;
+import com.rostyslav.trading.bot.model.ShrinkedCandle;
 import com.rostyslav.trading.bot.model.input.socket.Event;
 import com.rostyslav.trading.bot.model.input.socket.EventCandle;
 import com.rostyslav.trading.bot.notifier.TelegramNotifier;
@@ -11,7 +10,6 @@ import com.rostyslav.trading.bot.service.event.EventService;
 import com.rostyslav.trading.bot.service.indicator.calculator.RsiCalculator;
 import com.rostyslav.trading.bot.service.order.LastOrderSide;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -38,8 +36,6 @@ public class StochRsiStrategy implements TradingStrategy {
 
     private final OrderService orderService;
 
-    private final ObjectMapper objectMapper;
-
     private final RsiCalculator rsiCalculator;
 
     private final TelegramNotifier telegramNotifier;
@@ -48,7 +44,7 @@ public class StochRsiStrategy implements TradingStrategy {
 
     private final EventService eventService;
 
-    private final LinkedList<Candle> candles = new LinkedList<>();
+    private final LinkedList<ShrinkedCandle> candles = new LinkedList<>();
 
     private final AtomicReference<LastOrderSide> lastOrderSide = new AtomicReference<>();
 
@@ -58,9 +54,8 @@ public class StochRsiStrategy implements TradingStrategy {
 
     private boolean coldStart = true;
 
-    public StochRsiStrategy(String symbol, ObjectMapper objectMapper, Integer closedCandlesSizeThreshold, OrderService orderService, AtomicBoolean isInPosition, RsiCalculator rsiCalculator, TelegramNotifier telegramNotifier, CandleService candleService, EventService eventService) {
+    public StochRsiStrategy(String symbol, Integer closedCandlesSizeThreshold, OrderService orderService, AtomicBoolean isInPosition, RsiCalculator rsiCalculator, TelegramNotifier telegramNotifier, CandleService candleService, EventService eventService) {
         this.symbol = symbol;
-        this.objectMapper = objectMapper;
         this.closedCandlesSizeThreshold = closedCandlesSizeThreshold;
         this.orderService = orderService;
         this.isInPosition = isInPosition;
@@ -75,7 +70,7 @@ public class StochRsiStrategy implements TradingStrategy {
         orderService.syncLastMadeOrder(coldStart, symbol, atomicLastBuyPrice, atomicLastSellPrice, lastOrderSide);
         Event deserializedEvent = eventService.getDeserializedEvent(event);
         EventCandle eventCandle = getCandle(deserializedEvent);
-        Candle currentCandle = candleService.mapEventCandleToDomain(eventCandle);
+        ShrinkedCandle currentCandle = candleService.mapEventCandleToDomain(eventCandle);
         fillCandleQuee(deserializedEvent, currentCandle);
         double[] candlesPrices = getClosedCandlesPrices();
         Double rsi = getRSI(candlesPrices);
@@ -85,7 +80,7 @@ public class StochRsiStrategy implements TradingStrategy {
         if (rsi != null && rsi >= OVERBOUGHT_RSI && !isInPosition.get() && profitPercentage > 0.3 && atomicLastBuyPrice.get() < currentPrice && !lastOrderSide.get().equals(SELL)) {
             // flag check for price increase
             //save current price and check price movement up
-            //if rsi first time moves belove overbought then sell
+            //if rsi first time moves below overbought then sell
             sell(currentPrice);
             //wait/skip for 10sec
         }
@@ -132,7 +127,7 @@ public class StochRsiStrategy implements TradingStrategy {
         }
     }
 
-    @NotNull
+
     private Double getRSI(double[] candlesPrices) {
         double[] rsi = rsiCalculator.calculateRSI(candlesPrices, 30);
         Double lastRsi = rsi[rsi.length - 1];
@@ -151,7 +146,7 @@ public class StochRsiStrategy implements TradingStrategy {
         return eventCandle;
     }
 
-    private void fillCandleQuee(Event deserializedEvent, Candle latestCandle) {
+    private void fillCandleQuee(Event deserializedEvent, ShrinkedCandle latestCandle) {
         if (coldStart) {
             Long eventTime = deserializedEvent.getEventTime();
             long desiredLastCandleTime = eventTime - 1000L;
@@ -164,9 +159,9 @@ public class StochRsiStrategy implements TradingStrategy {
         }
     }
 
-    @NotNull
-    private List<Candle> getPreviousCandlesSortedByTimeInDesc(long desiredLastCandleTime) {
-        return candleService.getDeserializedCandles("BTCUSDT", desiredLastCandleTime, (short) 120)
+
+    private List<ShrinkedCandle> getPreviousCandlesSortedByTimeInDesc(long desiredLastCandleTime) {
+        return candleService.getDeserializedCandles("BTCUSDT", "1s",desiredLastCandleTime, (short) 120)
                             .stream()
                             .map(candleService::mapWebClientCandleToDomain)
                             .collect(Collectors.toList());

@@ -5,7 +5,9 @@ import lombok.Data;
 
 @Data
 @Builder
-public class Candle {
-  private Long openTime;
-  private Double closedPrice;
+public class ShrinkedCandle {
+
+    private Long openTime;
+
+    private Double closedPrice;
 }

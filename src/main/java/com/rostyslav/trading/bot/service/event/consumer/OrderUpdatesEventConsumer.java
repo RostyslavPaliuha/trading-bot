@@ -1,8 +1,7 @@
 package com.rostyslav.trading.bot.service.event.consumer;
 
 import com.binance.connector.client.SpotClient;
-import com.binance.connector.client.WebsocketClient;
-import com.binance.connector.client.impl.WebsocketClientImpl;
+import com.binance.connector.client.WebSocketStreamClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rostyslav.trading.bot.model.ListenKey;
@@ -15,7 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Slf4j
 public class OrderUpdatesEventConsumer {
 
-    private final WebsocketClient websocketClient;
+    private final WebSocketStreamClient websocketClient;
 
     private final ObjectMapper objectMapper;
 
@@ -23,7 +22,7 @@ public class OrderUpdatesEventConsumer {
 
     private AtomicBoolean isInPosition;
 
-    public OrderUpdatesEventConsumer(WebsocketClient websocketClient, ObjectMapper objectMapper, AtomicBoolean isInPosition, SpotClient spotClient) {
+    public OrderUpdatesEventConsumer(WebSocketStreamClient websocketClient, ObjectMapper objectMapper, AtomicBoolean isInPosition, SpotClient spotClient) {
         this.websocketClient = websocketClient;
         this.objectMapper = objectMapper;
         this.isInPosition = isInPosition;
@@ -50,7 +49,8 @@ public class OrderUpdatesEventConsumer {
 
     private ListenKey getListenKey() {
         try {
-            return objectMapper.readValue(spotClient.createUserData().createListenKey(), ListenKey.class);
+            return objectMapper.readValue(spotClient.createUserData()
+                                                    .createListenKey(), ListenKey.class);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
@@ -59,7 +59,7 @@ public class OrderUpdatesEventConsumer {
     private Map<String, Object> extractEventData(String data) {
         Map<String, Object> map = new HashMap<>();
         try {
-          map= objectMapper.readValue(data, map.getClass());
+           return objectMapper.readValue(data, map.getClass());
         } catch (JsonProcessingException e) {
             log.error("Extracting event data failed.");
         }

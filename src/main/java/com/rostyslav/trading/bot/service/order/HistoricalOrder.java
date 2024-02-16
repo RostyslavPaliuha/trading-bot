@@ -12,7 +12,10 @@ import lombok.NoArgsConstructor;
 public class HistoricalOrder {
 
     private String status;
+
     private String side;
+
     private Long time;
+
     private Double price;
 }

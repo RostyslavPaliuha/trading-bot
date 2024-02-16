@@ -8,7 +8,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rostyslav.trading.bot.configuration.PrivateConfig;
 import com.rostyslav.trading.bot.model.input.socket.Event;
-import com.rostyslav.trading.bot.service.candle.CandleWebClientResponse;
+import com.rostyslav.trading.bot.dto.CandleWebClientResponse;
 import java.util.List;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;

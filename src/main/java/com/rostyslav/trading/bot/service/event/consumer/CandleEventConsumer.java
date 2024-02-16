@@ -1,13 +1,14 @@
 package com.rostyslav.trading.bot.service.event.consumer;
 
-import com.binance.connector.client.WebsocketClient;
+import com.binance.connector.client.WebSocketStreamClient;
 import com.rostyslav.trading.bot.service.TradingStrategyHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONObject;
 
 @Slf4j
 public class CandleEventConsumer {
 
-    private final WebsocketClient websocketClient;
+    private final WebSocketStreamClient websocketClient;
 
     private final String symbol;
 
@@ -15,10 +16,7 @@ public class CandleEventConsumer {
 
     private final TradingStrategyHandler strategyHandler;
 
-    public CandleEventConsumer(WebsocketClient websocketClient,
-                               String symbol,
-                               String timeFrame,
-                               TradingStrategyHandler strategyHandler) {
+    public CandleEventConsumer(WebSocketStreamClient websocketClient, String symbol, String timeFrame, TradingStrategyHandler strategyHandler) {
         this.websocketClient = websocketClient;
         this.symbol = symbol;
         this.timeFrame = timeFrame;
@@ -26,16 +24,7 @@ public class CandleEventConsumer {
     }
 
     public void consume() {
-        websocketClient.klineStream(symbol, timeFrame,
-                OpenData -> {
-                    log.info("Open callback data:" + OpenData);
-                }, strategyHandler::onReceive,
-                ClosingData -> {
-                    log.info("Closing callback data:" + ClosingData);
-                },
-                FailureData -> {
-                    log.info("Failure callback data:" + FailureData);
-                });
+        websocketClient.klineStream(symbol, timeFrame, strategyHandler::onMessage);
     }
 
 }
