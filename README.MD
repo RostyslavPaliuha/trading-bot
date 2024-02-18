@@ -1,3 +1,5 @@
+Investigating binance API based on trading bot project.
+
 // TODO: 16.02.2023 Few helpful indicators!!!
 //  Moving Averages,
 //  Relative Strength Index (RSI),
